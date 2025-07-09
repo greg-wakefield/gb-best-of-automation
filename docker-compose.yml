@@ -1,0 +1,20 @@
+services:
+    app:
+        build: .
+        container_name: gb-best-of-automation
+        working_dir: /app
+        volumes:
+            - .:/app
+            - ~/.aws:/root/.aws
+    localstack:
+        image: localstack/localstack:latest
+        profiles: ["dev"]
+        ports:
+            - 4566:4566
+        environment:
+            - SERVICES=s3
+            - HOSTNAME=localstack
+        volumes:
+            - './config/localstack:/etc/localstack/init/ready.d'
+            - ~/.aws:/root/.aws
+
