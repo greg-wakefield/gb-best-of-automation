@@ -1,0 +1,1 @@
+export { putObject } from "./putObject";
