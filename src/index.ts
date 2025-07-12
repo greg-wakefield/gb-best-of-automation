@@ -1,30 +1,36 @@
 import path from "path";
 
-import { DOWNLOAD_PATH, SHEET_NAME, SPREADSHEET_ID } from "./environment";
+import { DOWNLOAD_PATH, IS_DEV, OUTPUT_FILENAME, SHEET_NAME, SPREADSHEET_ID } from "./environment";
 
 import logger from "./winston";
-import { getGbVideos, downloadVideoChunked } from "./gb-api";
 import { arrayToObjects, getSheet, SheetData, getWeek } from "./google-api";
 import { processSheetData, makeVideo } from "./ffmpeg";
 import { putObject } from "./aws/s3";
 
 async function main() {
+    console.time("automation");
     const sheetDataArray = await getSheet(SPREADSHEET_ID, SHEET_NAME);
     const sheetDataObject = arrayToObjects<SheetData>(sheetDataArray);
-    const gbData = await getGbVideos();
-    const processedGbData = processSheetData(sheetDataObject, gbData);
 
-    logger.info(`Downloading ${Object.values(processedGbData).length} videos...`);
-    await downloadVideoChunked(Array.from(Object.values(processedGbData)));
+    const processedData = await processSheetData(sheetDataObject);
 
-    const filename = `${getWeek()}.mp4`;
+    logger.verbose(`Processing data`, JSON.stringify(processedData, null, 3));
+
+    logger.info("Creating video from processed data...");
+    const filename = `${OUTPUT_FILENAME}.mp4`;
     await makeVideo({
-        options: processedGbData,
+        options: processedData,
         folderPath: DOWNLOAD_PATH,
         output: filename,
     });
-    await putObject(path.join(DOWNLOAD_PATH, filename), "video/mp4");
-    logger.info(`Video ${filename} uploaded to S3 successfully.`);
+
+    if (!IS_DEV) {
+        await putObject(path.join(DOWNLOAD_PATH, filename), "video/mp4");
+        logger.info(`Video ${filename} uploaded to S3 successfully.`);
+    }
+
+    logger.info("Video processing completed successfully.");
+    console.timeEnd("automation");
 }
 
 logger.info("Starting GB Best Of Automation...");
