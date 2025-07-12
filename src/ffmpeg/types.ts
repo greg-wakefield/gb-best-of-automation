@@ -1,8 +1,8 @@
-import { GbVideoInfo } from "../gb-api";
+import { VideoInfo } from "../yt-dlp/types";
 
-export type ClipRange = { start: number; end: number };
+export type ClipRange = { start: number; end: number; startHHMMSS: string; endHHMMSS: string };
 export type Options = {
-    [key: string]: { timestamps: ClipRange[] } & GbVideoInfo;
+    [key: string]: { timestamps: ClipRange[]; url: string } & VideoInfo;
 };
 
 export interface EditOptions {

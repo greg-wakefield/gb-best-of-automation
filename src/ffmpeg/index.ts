@@ -1,2 +1,2 @@
-export { getYoutubeIdFromUrls, processSheetData } from "./processClips";
+export { processSheetData } from "./processClips";
 export { makeVideo } from "./makeVideo";

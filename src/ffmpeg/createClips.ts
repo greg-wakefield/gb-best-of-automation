@@ -1,40 +1,45 @@
 import path from "path";
-import Ffmpeg from "fluent-ffmpeg";
 import { v4 as uuidv4 } from "uuid";
 
 import { EditOptions } from "./types";
-import { FONT_PATH } from "../environment";
 import logger from "../winston";
+import { downloadVideo } from "../yt-dlp";
 
 export async function createClips({ options, folderPath }: EditOptions) {
     const tempFiles: string[] = [];
     try {
-        for (const [filename, clips] of Object.entries(options)) {
-            const inputPath = path.join(folderPath, `${filename}.mp4`);
-            logger.info(`Processing video: ${filename}`);
+        for (const [key, info] of Object.entries(options)) {
+            logger.info(`Processing video: ${info.title} (${info.url})`);
 
-            for (const [index, clip] of clips.timestamps.entries()) {
-                const tempOutput = path.join(folderPath, `clip_${uuidv4()}.mp4`);
-                const duration = clip.end - clip.start;
-                await new Promise<void>((resolve, reject) => {
-                    Ffmpeg(inputPath)
-                        .setStartTime(clip.start)
-                        .setDuration(duration)
-                        // .videoFilters(
-                        //     index === 0
-                        //         ? [
-                        //               `drawtext=fontfile=${FONT_PATH}:text=${clips.name}:fontcolor=white:fontsize=64:box=1:boxcolor=black@0.5:boxborderw=5:x=50:y=h-(text_h*4):enable='lt(t,5)':alpha='if(lt(t,1),t,if(lt(t,4),1,if(lt(t,5),5-t,0)))'`,
-                        //           ]
-                        //         : []
-                        // )
-                        .outputOptions("-codec:a", "copy")
-                        .output(tempOutput)
-                        .on("end", () => {
-                            tempFiles.push(tempOutput);
-                            resolve();
-                        })
-                        .on("error", (error) => reject(`Error processing video clip ${filename}: ${error.message}`))
-                        .run();
+            for (const [index, clip] of info.timestamps.entries()) {
+                const filename = `${info.title.replace(/[^a-zA-Z0-9]/g, "")}-${index + 1}`;
+                logger.info(`Creating clip ${index + 1}: ${clip.startHHMMSS} - ${clip.endHHMMSS}`);
+                const ext = info.ext;
+                const tempOutput = path.join(folderPath, `${filename}.${ext}`);
+
+                const downloadOptions = {
+                    filename: filename,
+                    startTime: clip.startHHMMSS,
+                    endTime: clip.endHHMMSS,
+                    folderPath: folderPath,
+                };
+
+                try {
+                    await downloadVideo(info.url, downloadOptions);
+                } catch (error) {
+                    logger.error(`Failed to download video for clip ${index + 1}:`, {
+                        error,
+                        url: info.url,
+                        start: clip.startHHMMSS,
+                        end: clip.endHHMMSS,
+                    });
+                    break;
+                }
+                tempFiles.push(tempOutput);
+
+                // Delay to stop rate limiting
+                await new Promise<void>((resolve) => {
+                    setTimeout(resolve, 5000);
                 });
             }
         }
