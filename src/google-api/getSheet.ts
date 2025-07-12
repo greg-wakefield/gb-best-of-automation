@@ -1,10 +1,9 @@
 import { GoogleAuth, AuthClient } from "google-auth-library";
 import { getGoogleAuth } from "./getGoogleAuth";
-import { SheetData } from "./types";
 
 export async function getSheet(spreadsheetId: string, sheetName: string, auth: GoogleAuth<AuthClient> = getGoogleAuth()) {
     const client = await auth.getClient();
-    const range = `${sheetName}!A1:Z1000`;
+    const range = `${sheetName}!A1:Z`;
     const res = await client.request({
         url: `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?valueRenderOption=UNFORMATTED_VALUE`,
     });
