@@ -12,6 +12,3 @@ export function arrayToObjects<T>(arr: any[][]): T[] {
         return obj as T;
     });
 }
-export function getUniqueUrls(sheetData: any[][]) {
-    return sheetData.slice(1).reduce((acc, row) => acc.add(row[0]), new Set<string>());
-}

@@ -1,5 +1,5 @@
 export type SheetData = {
-    youtubeLink: string;
+    url: string;
     inTime: string;
     outTime: string;
 };
