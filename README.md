@@ -18,7 +18,7 @@ This project is a video processing pipeline that automates the creation of "best
 
 -   Node.js
 -   Docker
--   Access credentials for Google Cloud Platform, AWS, and the Giant Bomb API.
+-   Access credentials for Google Cloud Platform, AWS (If using in production).
 
 ### Installation
 
@@ -30,7 +30,7 @@ This project is a video processing pipeline that automates the creation of "best
     ```sh
     npm install
     ```
-3.  Create a `.env` file in the root of the project and add the necessary environment variables for the APIs and services.
+3.  Create a `.env` file in the root of the project and add the necessary environment variables for the APIs and services. See `.env.example`
 
 ## Usage
 
