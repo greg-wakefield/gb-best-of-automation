@@ -1,7 +1,7 @@
 import Ffmpeg from "fluent-ffmpeg";
 import path from "path";
 
-import { EditOptions } from "./types";
+import { EditOptions } from "../types";
 import logger from "../winston";
 
 export async function concatinateClips({ folderPath, output }: EditOptions, clips: string[]): Promise<void> {

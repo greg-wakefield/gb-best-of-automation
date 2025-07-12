@@ -3,9 +3,10 @@ import path from "path";
 import { DOWNLOAD_PATH, IS_DEV, OUTPUT_FILENAME, SHEET_NAME, SPREADSHEET_ID } from "./environment";
 
 import logger from "./winston";
-import { arrayToObjects, getSheet, SheetData, getWeek } from "./google-api";
+import { arrayToObjects, getSheet } from "./google-api";
 import { processSheetData, makeVideo } from "./ffmpeg";
 import { putObject } from "./aws/s3";
+import { SheetData } from "./types";
 
 async function main() {
     console.time("automation");
@@ -19,7 +20,7 @@ async function main() {
     logger.info("Creating video from processed data...");
     const filename = `${OUTPUT_FILENAME}.mp4`;
     await makeVideo({
-        options: processedData,
+        clips: processedData,
         folderPath: DOWNLOAD_PATH,
         output: filename,
     });

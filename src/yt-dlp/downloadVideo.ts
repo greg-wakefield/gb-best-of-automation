@@ -3,29 +3,24 @@ import { promisify } from "util";
 import path from "path";
 import fs from "fs";
 
-import { DownloadOptions } from "./types";
+import { DownloadOptions } from "../types";
 
 export const execAsync = promisify(exec);
 
-export async function downloadVideo(url: string, options: DownloadOptions) {
-    const { folderPath, filename, startTime, endTime } = options;
+export async function downloadVideo(options: DownloadOptions) {
+    const { folderPath, filename } = options;
 
     if (!fs.existsSync(folderPath)) {
         fs.mkdirSync(folderPath, { recursive: true });
     }
 
-    const command = buildDownloadCommand(url, {
-        folderPath,
-        filename,
-        startTime,
-        endTime,
-    });
+    const command = buildDownloadCommand(options);
 
     try {
         await execAsync(command);
 
         const files = fs.readdirSync(folderPath);
-        const downloadedFile = files.find((file) => (filename ? file.includes(filename) : file.includes(".")));
+        const downloadedFile = files.find((file) => file.includes(filename));
 
         if (!downloadedFile) {
             throw new Error("Downloaded file not found");
@@ -42,14 +37,14 @@ export async function downloadVideo(url: string, options: DownloadOptions) {
     }
 }
 
-function buildDownloadCommand(url: string, options: DownloadOptions): string {
-    const { folderPath, filename, startTime, endTime } = options;
+function buildDownloadCommand(options: DownloadOptions): string {
+    const { url, folderPath, filename, inTime, outTime } = options;
 
-    let command = `yt-dlp --force-keyframes-at-cuts --download-sections "*${startTime}-${endTime}"`;
+    let command = `yt-dlp --force-keyframes-at-cuts --download-sections "*${inTime}-${outTime}"`;
 
-    const outputTemplate = path.join(folderPath, `${filename}.%(ext)s`);
+    const filePath = path.join(folderPath, `${filename}.%(ext)s`);
 
-    command += ` -o "${outputTemplate}"`;
+    command += ` -o "${filePath}"`;
     command += ` "${url}"`;
 
     return command;

@@ -5,11 +5,12 @@ import {
     MAX_CLIP_DURATION_SECONDS,
     MIN_CLIP_DURATION_SECONDS,
 } from "../environment";
-import { SheetData } from "../google-api";
+
 import logger from "../winston";
-import { ClipRange, Options } from "./types";
+import { ClipRange, Clip, SheetData } from "../types";
 import { getVideoInfo } from "../yt-dlp/getVideoInfo";
 import { isDate } from "util/types";
+import { VideoInfo } from "../yt-dlp";
 
 function convertToSeconds(hours: number, minutes: number, seconds: number): number {
     return hours * 3600 + minutes * 60 + seconds;
@@ -42,7 +43,7 @@ function mergeOverlappingClips(clips: ClipRange[]): ClipRange[] {
         return clips;
     }
 
-    const sortedClips = clips.sort((a, b) => a.start - b.start);
+    const sortedClips = clips.sort((a, b) => a.inTimeSeconds - b.inTimeSeconds);
 
     const mergedClips: ClipRange[] = [sortedClips[0]];
 
@@ -50,16 +51,16 @@ function mergeOverlappingClips(clips: ClipRange[]): ClipRange[] {
         const lastMergedClip = mergedClips[mergedClips.length - 1];
         const currentClip = sortedClips[i];
 
-        if (currentClip.start < lastMergedClip.end) {
-            let end: string;
-            if (lastMergedClip.end > currentClip.end) {
-                end = lastMergedClip.endHHMMSS;
+        if (currentClip.inTimeSeconds < lastMergedClip.outTimeSeconds) {
+            let outTime: string;
+            if (lastMergedClip.outTimeSeconds > currentClip.outTimeSeconds) {
+                outTime = lastMergedClip.outTime;
             } else {
-                end = currentClip.endHHMMSS;
+                outTime = currentClip.outTime;
             }
 
-            lastMergedClip.end = Math.max(lastMergedClip.end, currentClip.end);
-            lastMergedClip.endHHMMSS = end;
+            lastMergedClip.outTimeSeconds = Math.max(lastMergedClip.outTimeSeconds, currentClip.outTimeSeconds);
+            lastMergedClip.outTime = outTime;
         } else {
             mergedClips.push(currentClip);
         }
@@ -81,16 +82,18 @@ export async function processSheetData(
     sheetData: SheetData[],
     minClipDurationSeconds = MIN_CLIP_DURATION_SECONDS,
     maxClipDurationSeconds = MAX_CLIP_DURATION_SECONDS
-): Promise<Options> {
+): Promise<Clip[]> {
     const intermediateClips: { [key: string]: ClipRange[] } = {};
-    const options: Options = {};
+    const clipInfo: Record<string, VideoInfo & SheetData> = {};
+    const clips: Clip[] = [];
 
     for (let i = 0; i < sheetData.length; i += 5) {
-        const chunk = sheetData.slice(i, i + 5);
+        const dataChunk = sheetData.slice(i, i + 5);
         await Promise.all(
-            chunk.map(async (row) => {
+            dataChunk.map(async (row) => {
                 try {
-                    const videoInfo = await getVideoInfo(row.url);
+                    const { url, inTime, outTime } = row;
+                    const videoInfo = await getVideoInfo(url);
 
                     if (!videoInfo) {
                         return;
@@ -109,18 +112,20 @@ export async function processSheetData(
                         return;
                     }
 
-                    const [inHours, inMinutes, inSeconds] = row.inTime.split(":").map((time) => validateAndParseTime(time));
-                    const [outHours, outMinutes, outSeconds] = row.outTime.split(":").map((time) => validateAndParseTime(time));
-                    const start = convertToSeconds(inHours, inMinutes, inSeconds);
-                    const end = convertToSeconds(outHours, outMinutes, outSeconds);
+                    const [inHours, inMinutes, inSeconds] = inTime.split(":").map((time) => validateAndParseTime(time));
+                    const [outHours, outMinutes, outSeconds] = outTime
+                        .split(":")
+                        .map((time) => validateAndParseTime(time));
+                    const inTimeSeconds = convertToSeconds(inHours, inMinutes, inSeconds);
+                    const outTimeSeconds = convertToSeconds(outHours, outMinutes, outSeconds);
 
-                    if (start < 0 || end < 0 || start >= end) {
+                    if (inTimeSeconds < 0 || outTimeSeconds < 0 || inTimeSeconds >= outTimeSeconds) {
                         logger.warn("Invalid clip range:", {
-                            url: row.url,
-                            start,
-                            end,
-                            inTime: row.inTime,
-                            outTime: row.outTime,
+                            url,
+                            inTimeSeconds,
+                            outTimeSeconds,
+                            inTime,
+                            outTime,
                         });
                         return;
                     }
@@ -128,7 +133,7 @@ export async function processSheetData(
                     const { duration_string, timestamp } = videoInfo;
 
                     if (!timestamp || !duration_string) {
-                        logger.warn("Missing video info:", { url: row.url, videoInfo });
+                        logger.warn("Missing video info:", { url, videoInfo });
                         return;
                     }
 
@@ -147,17 +152,17 @@ export async function processSheetData(
                             videoSeconds = durations[durations.length - 1];
                             break;
                         default:
-                            logger.warn("Unexpected duration format:", { url: row.url, duration_string });
+                            logger.warn("Unexpected duration format:", { url, duration_string });
                             return;
                     }
 
                     const videoLengthSeconds = convertToSeconds(videoHours, videoMinutes, videoSeconds);
 
-                    if (start >= videoLengthSeconds || end >= videoLengthSeconds) {
+                    if (inTimeSeconds >= videoLengthSeconds || outTimeSeconds >= videoLengthSeconds) {
                         logger.warn("Clip range exceeds video length:", {
-                            url: row.url,
-                            start,
-                            end,
+                            url: url,
+                            inTimeSeconds: inTimeSeconds,
+                            end: outTimeSeconds,
                             videoLengthSeconds,
                         });
                         return;
@@ -166,7 +171,7 @@ export async function processSheetData(
                     const publishDate = new Date(videoInfo.timestamp * 1000);
 
                     if (!publishDate || !isDate(publishDate)) {
-                        logger.warn("Invalid publish date for video:", { url: row.url, publishDate });
+                        logger.warn("Invalid publish date for video:", { url, publishDate });
                         return;
                     }
 
@@ -185,12 +190,12 @@ export async function processSheetData(
                         return;
                     }
 
-                    const duration = end - start;
+                    const duration = outTimeSeconds - inTimeSeconds;
                     if (duration > maxClipDurationSeconds || duration < minClipDurationSeconds) {
                         logger.warn("Clip duration out of bounds:", {
-                            url: row.url,
-                            start,
-                            end,
+                            url,
+                            inTimeSeconds,
+                            outTimeSeconds,
                             duration,
                             minClipDurationSeconds,
                             maxClipDurationSeconds,
@@ -198,12 +203,17 @@ export async function processSheetData(
                         return;
                     }
 
-                    if (!intermediateClips[row.url]) {
-                        intermediateClips[row.url] = [];
-                        options[row.url] = { ...videoInfo, url: row.url, timestamps: [] };
+                    if (!intermediateClips[url]) {
+                        intermediateClips[url] = [];
+                        clipInfo[url] = { ...videoInfo, ...row };
                     }
 
-                    intermediateClips[row.url].push({ start, end, startHHMMSS: row.inTime, endHHMMSS: row.outTime });
+                    intermediateClips[row.url].push({
+                        inTimeSeconds,
+                        outTimeSeconds,
+                        inTime,
+                        outTime,
+                    });
                 } catch (error) {
                     logger.error("Error processing row:", { error, row });
                     return;
@@ -214,8 +224,11 @@ export async function processSheetData(
 
     for (const url in intermediateClips) {
         const merged = mergeOverlappingClips(intermediateClips[url]);
-        options[url].timestamps = merged;
+
+        merged.forEach((clip) => {
+            clips.push({ ...clipInfo[url], ...clip });
+        });
     }
 
-    return options;
+    return clips;
 }

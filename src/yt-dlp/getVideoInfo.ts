@@ -1,6 +1,6 @@
 import logger from "../winston";
 import { execAsync } from "./downloadVideo";
-import { VideoInfo } from "./types";
+import { VideoInfo } from "../types";
 
 const videoInfoCache = new Map<string, Promise<VideoInfo>>();
 export async function getVideoInfo(url: string): Promise<VideoInfo> {
@@ -32,6 +32,6 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
         videoInfoCache.set(url, requestPromise);
         return await requestPromise;
     } catch (error) {
-        throw error;
+        throw new Error(`Error getting video info for ${url}: ${error}`);
     }
 }
