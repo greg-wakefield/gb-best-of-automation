@@ -30,6 +30,7 @@ const DOWNLOAD_PATH = process.env.DOWNLOAD_PATH || "./tmp/videos";
 const BEGIN_PUBLISH_DATE_DAYS = parseInt(process.env.BEGIN_PUBLISH_DATE_DAYS || "14");
 const END_PUBLISH_DATE_DAYS = parseInt(process.env.END_PUBLISH_DATE_DAYS || "7");
 const OUTPUT_FILENAME = process.env.OUTPUT_FILENAME || getWeek();
+const CHUNK_SIZE = parseInt(process.env.CHUNK_SIZE || "5");
 
 export {
     GOOGLE_CLIENT_EMAIL,
@@ -48,4 +49,5 @@ export {
     END_PUBLISH_DATE_DAYS,
     IS_DEV,
     OUTPUT_FILENAME,
+    CHUNK_SIZE,
 };

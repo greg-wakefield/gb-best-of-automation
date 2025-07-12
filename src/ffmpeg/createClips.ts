@@ -1,47 +1,45 @@
-import path from "path";
-import { v4 as uuidv4 } from "uuid";
-
-import { EditOptions } from "./types";
+import { CHUNK_SIZE } from "../environment";
+import { EditOptions } from "../types";
 import logger from "../winston";
 import { downloadVideo } from "../yt-dlp";
 
-export async function createClips({ options, folderPath }: EditOptions) {
+export async function createClips({ clips, folderPath }: EditOptions) {
     const tempFiles: string[] = [];
     try {
-        for (const [key, info] of Object.entries(options)) {
-            logger.info(`Processing video: ${info.title} (${info.url})`);
+        for (let index = 0; index < clips.length; index += CHUNK_SIZE) {
+            const chunkedClips = clips.slice(index, index + CHUNK_SIZE);
+            const promises: Promise<{ filePath: string; filename: string }>[] = [];
+            for (const clip of chunkedClips) {
+                const { title, url, inTime, outTime, inTimeSeconds, outTimeSeconds } = clip;
+                logger.info(`Processing video: ${title} ${inTime} - ${outTime} (${url})`);
 
-            for (const [index, clip] of info.timestamps.entries()) {
-                const filename = `${info.title.replace(/[^a-zA-Z0-9]/g, "")}-${index + 1}`;
-                logger.info(`Creating clip ${index + 1}: ${clip.startHHMMSS} - ${clip.endHHMMSS}`);
-                const ext = info.ext;
-                const tempOutput = path.join(folderPath, `${filename}.${ext}`);
+                const filename = `${title.replace(/[^a-zA-Z0-9]/g, "")}_${inTimeSeconds}-${outTimeSeconds}`;
 
                 const downloadOptions = {
-                    filename: filename,
-                    startTime: clip.startHHMMSS,
-                    endTime: clip.endHHMMSS,
-                    folderPath: folderPath,
+                    ...clip,
+                    filename,
+                    folderPath,
                 };
 
                 try {
-                    await downloadVideo(info.url, downloadOptions);
+                    promises.push(downloadVideo(downloadOptions));
                 } catch (error) {
-                    logger.error(`Failed to download video for clip ${index + 1}:`, {
+                    logger.error(`Failed to download video for clip ${filename}:`, {
                         error,
-                        url: info.url,
-                        start: clip.startHHMMSS,
-                        end: clip.endHHMMSS,
+                        url,
+                        inTime,
+                        outTime,
                     });
                     break;
                 }
-                tempFiles.push(tempOutput);
-
-                // Delay to stop rate limiting
-                await new Promise<void>((resolve) => {
-                    setTimeout(resolve, 5000);
-                });
             }
+
+            tempFiles.push(...(await Promise.all(promises)).map(({ filePath }) => filePath));
+
+            // Delay to stop rate limiting
+            await new Promise<void>((resolve) => {
+                setTimeout(resolve, 5000);
+            });
         }
     } catch (error) {
         logger.error("Error creating clips:", { error });
