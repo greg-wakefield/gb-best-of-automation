@@ -100,6 +100,7 @@ export async function processSheetData(
                     }
 
                     if (
+                        videoInfo &&
                         !videoInfo.uploader
                             .toLowerCase()
                             .replace(/ /gm, "")
@@ -113,9 +114,7 @@ export async function processSheetData(
                     }
 
                     const [inHours, inMinutes, inSeconds] = inTime.split(":").map((time) => validateAndParseTime(time));
-                    const [outHours, outMinutes, outSeconds] = outTime
-                        .split(":")
-                        .map((time) => validateAndParseTime(time));
+                    const [outHours, outMinutes, outSeconds] = outTime.split(":").map((time) => validateAndParseTime(time));
                     const inTimeSeconds = convertToSeconds(inHours, inMinutes, inSeconds);
                     const outTimeSeconds = convertToSeconds(outHours, outMinutes, outSeconds);
 

@@ -18,7 +18,6 @@ const getEnvVariable = (name: string): string => {
 const GOOGLE_CLIENT_EMAIL = getEnvVariable("GOOGLE_CLIENT_EMAIL");
 const GOOGLE_PRIVATE_KEY = getEnvVariable("GOOGLE_PRIVATE_KEY").replace(/\\n/g, "\n");
 const SPREADSHEET_ID = getEnvVariable("SPREADSHEET_ID");
-const CHANNEL_NAME = getEnvVariable("CHANNEL_NAME");
 const S3_BUCKET_NAME = getEnvVariable("S3_BUCKET_NAME");
 const AWS_DEFAULT_REGION = getEnvVariable("AWS_DEFAULT_REGION");
 const SHEET_NAME = getEnvVariable("SHEET_NAME");
@@ -31,6 +30,7 @@ const BEGIN_PUBLISH_DATE_DAYS = parseInt(process.env.BEGIN_PUBLISH_DATE_DAYS || 
 const END_PUBLISH_DATE_DAYS = parseInt(process.env.END_PUBLISH_DATE_DAYS || "7");
 const OUTPUT_FILENAME = process.env.OUTPUT_FILENAME || getWeek();
 const CHUNK_SIZE = parseInt(process.env.CHUNK_SIZE || "5");
+const CHANNEL_NAME = process.env.CHANNEL_NAME || "";
 
 export {
     GOOGLE_CLIENT_EMAIL,
